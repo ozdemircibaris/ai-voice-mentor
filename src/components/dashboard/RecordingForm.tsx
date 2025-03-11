@@ -29,6 +29,7 @@ const RecordingForm = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   const [formData, setFormData] = useState({
     title: "",
@@ -59,6 +60,7 @@ const RecordingForm = () => {
   };
 
   const handleRecordingComplete = (audioBlob: Blob, audioUrl: string, duration: number) => {
+    console.log("Recording complete, duration:", duration);
     setRecordingData({
       audioBlob,
       audioUrl,
@@ -70,6 +72,7 @@ const RecordingForm = () => {
     e.preventDefault();
     setError(null);
     setSuccess(null);
+    setUploadProgress(0);
 
     if (!recordingData.audioBlob) {
       setError("Please record audio before submitting");
@@ -88,29 +91,48 @@ const RecordingForm = () => {
       const uploadFormData = new FormData();
       uploadFormData.append("audio", recordingData.audioBlob, `${formData.title.replace(/\s+/g, "_")}.wav`);
 
-      // Upload audio file to Supabase storage via our API
+      // Upload audio file to storage via our API
+      console.log("Uploading audio file...");
       const uploadResponse = await axios.post("/api/uploads/audio", uploadFormData, {
         headers: {
           "Content-Type": "multipart/form-data",
         },
+        onUploadProgress: (progressEvent) => {
+          if (progressEvent.total) {
+            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            setUploadProgress(percentCompleted);
+          }
+        },
       });
 
+      if (!uploadResponse.data || !uploadResponse.data.audioUrl) {
+        throw new Error("Failed to upload audio: No URL returned");
+      }
+
       const { audioUrl } = uploadResponse.data;
+      console.log("Audio uploaded successfully:", audioUrl);
 
       // Create recording record in database
+      console.log("Creating recording record...");
       const recordingResponse = await axios.post("/api/recordings", {
         title: formData.title,
-        description: formData.description,
+        description: formData.description || "",
         type: formData.type,
         targetAudience: formData.targetAudience,
         isPublic: formData.isPublic,
-        audioUrl,
-        duration: recordingData.duration,
+        audioUrl: audioUrl,
+        duration: recordingData.duration || 0,
       });
 
+      if (!recordingResponse.data || !recordingResponse.data.id) {
+        throw new Error("Failed to create recording record");
+      }
+
       const { id: recordingId } = recordingResponse.data;
+      console.log("Recording created with ID:", recordingId);
 
       // Trigger analysis in the background
+      console.log("Triggering analysis...", recordingId);
       await axios.post(`/api/recordings/${recordingId}/analyze`);
 
       setSuccess("Recording saved! Analysis is in progress...");
@@ -119,9 +141,9 @@ const RecordingForm = () => {
       setTimeout(() => {
         router.push(`/recordings/${recordingId}`);
       }, 2000);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving recording:", error);
-      setError("Failed to save recording. Please try again.");
+      setError(error.response?.data?.error || error.message || "Failed to save recording. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -228,11 +250,20 @@ const RecordingForm = () => {
             </label>
           </div>
 
+          {isSubmitting && uploadProgress > 0 && (
+            <div className="w-full bg-gray-200 rounded-full h-2.5">
+              <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${uploadProgress}%` }}></div>
+              <p className="text-xs text-gray-500 mt-1 text-right">{uploadProgress}% uploaded</p>
+            </div>
+          )}
+
           <div className="flex justify-end">
             <button
               type="submit"
               disabled={isSubmitting}
-              className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md font-medium flex items-center justify-center"
+              className={`px-4 py-2 rounded-md font-medium flex items-center justify-center ${
+                isSubmitting ? "bg-gray-400 text-white cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700 text-white"
+              }`}
             >
               {isSubmitting ? "Saving..." : "Save and Analyze Recording"}
             </button>

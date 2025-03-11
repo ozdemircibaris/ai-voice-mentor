@@ -5,6 +5,7 @@ import { notFound, redirect } from "next/navigation";
 import { ArrowLeft, Play, Edit, Trash2, Clock, Calendar, Download } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import AnalysisDisplay from "@/components/dashboard/AnalysisDisplay";
+import RetryAnalysisButton from "@/components/dashboard/RetryAnalysisButton";
 
 interface RecordingPageProps {
   params: {
@@ -161,17 +162,27 @@ export default async function RecordingPage({ params }: RecordingPageProps) {
 
         {analysis ? (
           <div className="px-6 py-5">
-            <h2 className="text-lg font-medium text-gray-900 mb-4">Analysis Results</h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-medium text-gray-900">Analysis Results</h2>
+              <RetryAnalysisButton recordingId={id} />
+            </div>
             <AnalysisDisplay recording={recording} analysis={analysis} />
           </div>
         ) : (
           <div className="px-6 py-5">
             <div className="bg-yellow-50 border border-yellow-100 rounded-lg p-4">
-              <h2 className="text-lg font-medium text-yellow-800">Analysis in Progress</h2>
-              <p className="text-yellow-700 mt-1">
-                We're analyzing your recording. This may take a few minutes. Refresh the page shortly to see your
-                results.
-              </p>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
+                <div>
+                  <h2 className="text-lg font-medium text-yellow-800">Analysis in Progress</h2>
+                  <p className="text-yellow-700 mt-1">
+                    We're analyzing your recording. This may take a few minutes. Refresh the page shortly to see your
+                    results.
+                  </p>
+                </div>
+                <div className="mt-4 sm:mt-0">
+                  <RetryAnalysisButton recordingId={id} />
+                </div>
+              </div>
             </div>
           </div>
         )}

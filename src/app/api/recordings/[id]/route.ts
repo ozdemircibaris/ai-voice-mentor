@@ -54,7 +54,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const { id } = params;
-    const session = await getSession();
+    const session = await auth0.getSession();
 
     if (!session || !session.user) {
       return new NextResponse(JSON.stringify({ error: "Not authenticated" }), { status: 401 });
@@ -115,7 +115,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const { id } = params;
-    const session = await getSession();
+    const session = await auth0.getSession();
 
     if (!session || !session.user) {
       return new NextResponse(JSON.stringify({ error: "Not authenticated" }), { status: 401 });
