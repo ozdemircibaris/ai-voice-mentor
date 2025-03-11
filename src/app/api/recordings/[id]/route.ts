@@ -1,7 +1,7 @@
 // app/api/recordings/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { auth0 } from "@/lib/auth0";
-import prisma from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 
 // Get a specific recording by ID
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {

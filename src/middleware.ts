@@ -1,3 +1,4 @@
+// src/middleware.ts
 import type { NextRequest } from "next/server";
 import { auth0 } from "./lib/auth0";
 

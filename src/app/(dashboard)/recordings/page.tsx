@@ -3,7 +3,7 @@ import { auth0 } from "@/lib/auth0";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Plus, Search, ChevronDown } from "lucide-react";
-import prisma from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 import RecordingsList from "@/components/dashboard/RecordingsList";
 
 async function getRecordings() {

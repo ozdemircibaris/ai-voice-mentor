@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { redirect } from "next/navigation";
 import { User, Mail, CreditCard, Award, Save, Settings } from "lucide-react";
-import prisma from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 
 async function getUserData() {
   const session = await auth0.getSession();

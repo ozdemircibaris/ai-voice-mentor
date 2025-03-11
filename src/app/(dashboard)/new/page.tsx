@@ -3,7 +3,7 @@ import { auth0 } from "@/lib/auth0";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import prisma from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 import RecordingForm from "@/components/dashboard/RecordingForm";
 
 async function getUserData() {

@@ -1,7 +1,7 @@
 // app/api/recordings/[id]/analyze/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { auth0 } from "@/lib/auth0";
-import prisma from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 
 // Mock data for demo purposes - in a real app, this would be connected to an AI service
 function generateMockAnalysis(recording: any) {

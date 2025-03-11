@@ -1,42 +1,18 @@
 // app/(dashboard)/layout.tsx
-import { auth0 } from "@/lib/auth0";
+"use client";
+
 import Link from "next/link";
 import Image from "next/image";
-import { redirect } from "next/navigation";
 import { Menu, User, Bell } from "lucide-react";
-import prisma from "@/lib/prisma";
 import { Suspense } from "react";
+import { useAuth } from "@/hooks/useAuth.hook";
 
-async function getUserInfo() {
-  const session = await auth0.getSession();
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const { user, isLoading } = useAuth();
+  console.log("user", user);
 
-  if (!session) {
-    return null;
-  }
-
-  // Find user by Auth0 ID
-  const user = await prisma.user.findUnique({
-    where: {
-      auth0Id: session.user.sub,
-    },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      avatarUrl: true,
-      isPremium: true,
-    },
-  });
-
-  return user;
-}
-
-export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const user = await getUserInfo();
-
-  if (!user) {
-    redirect("/login");
-  }
+  if (isLoading) return null;
+  if (!user) return null;
 
   return (
     <>

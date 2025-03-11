@@ -14,7 +14,7 @@ async function getDashboardData() {
   }
 
   // Find user by Auth0 ID
-  const user = await prisma.user.findUnique({
+  const user = await prisma.user?.findUnique({
     where: {
       auth0Id: session.user.sub,
     },

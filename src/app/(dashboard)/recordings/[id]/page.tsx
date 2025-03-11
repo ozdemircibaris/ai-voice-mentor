@@ -3,7 +3,7 @@ import { auth0 } from "@/lib/auth0";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowLeft, Play, Edit, Trash2, Clock, Calendar, Download } from "lucide-react";
-import prisma from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 import AnalysisDisplay from "@/components/dashboard/AnalysisDisplay";
 
 interface RecordingPageProps {
