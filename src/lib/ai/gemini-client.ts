@@ -178,53 +178,29 @@ Your response MUST be in valid JSON format with the following structure exactly:
     });
 
     try {
-      // Backtick içine alınmış JSON yanıtını düzgün şekilde çıkar
-      const jsonMatch = response.text.match(/```json\s*([\s\S]*?)\s*```/);
-      let analysisResult;
-
-      if (jsonMatch && jsonMatch[1]) {
-        analysisResult = JSON.parse(jsonMatch[1]);
+      // JSON yanıtı parse et
+      console.log("jsonMatch", response);
+      const jsonMatch = response.text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        return JSON.parse(jsonMatch[0]);
       } else {
-        // Backtick yoksa normal JSON yapısını ara
-        const plainJsonMatch = response.text.match(/\{[\s\S]*\}/);
-        if (plainJsonMatch) {
-          analysisResult = JSON.parse(plainJsonMatch[0]);
-        } else {
-          throw new Error("Could not extract valid JSON from response");
-        }
+        throw new Error("No JSON found in response");
       }
-
-      // Varsayılan değerler ekleme - zayıf veya boş değerler durumunda yedek
-      return {
-        speechRate: {
-          wpm:
-            analysisResult.speechRate?.wpm ||
-            Math.max(60, Math.floor(transcription.split(/\s+/).length * (60 / audioMetadata.duration))),
-          assessment: analysisResult.speechRate?.assessment || "Your speaking pace is acceptable.",
-        },
-        fillerWords: {
-          count: analysisResult.fillerWords?.count || countFillerWords(transcription),
-          mostCommon: analysisResult.fillerWords?.mostCommon || findFillerWords(transcription),
-          assessment:
-            analysisResult.fillerWords?.assessment || "Try to minimize filler words for more confident delivery.",
-        },
-        emotionalTone: {
-          confidence: analysisResult.emotionalTone?.confidence || 65,
-          enthusiasm: analysisResult.emotionalTone?.enthusiasm || 60,
-          assessment: analysisResult.emotionalTone?.assessment || "Your tone conveys moderate confidence.",
-        },
-        contentClarity: {
-          assessment: analysisResult.contentClarity?.assessment || "Your content is structured in a clear manner.",
-        },
-        strengths: analysisResult.strengths || generateStrengths(transcription),
-        improvementAreas: analysisResult.improvementAreas || generateImprovementAreas(transcription),
-        recommendations: analysisResult.recommendations || generateRecommendations(transcription, audioMetadata),
-        overallScore: analysisResult.overallScore || Math.max(50, calculateBasicScore(transcription, audioMetadata)),
-      };
     } catch (error) {
-      console.error("Failed to parse AI response:", error);
-      // Fallback yanıt - hiçbir şey çalışmazsa makul değerler
-      return createFallbackAnalysis(transcription, audioMetadata);
+      console.error("Failed to parse AI response as JSON:", error);
+      console.log("Raw response:", response);
+
+      // Fallback yanıt
+      return {
+        speechRate: { wpm: 0, assessment: "Could not be determined" },
+        fillerWords: { count: 0, mostCommon: [], assessment: "Could not be determined" },
+        emotionalTone: { confidence: 0, enthusiasm: 0, assessment: "Could not be determined" },
+        contentClarity: { assessment: "Could not be determined" },
+        strengths: ["Could not be determined"],
+        improvementAreas: ["Could not be determined"],
+        recommendations: ["Could not be determined"],
+        overallScore: 0,
+      };
     }
   } catch (error) {
     console.error("Error calling Gemini API:", error);
