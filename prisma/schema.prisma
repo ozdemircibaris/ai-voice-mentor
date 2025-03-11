@@ -1,0 +1,71 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String      @id @default(cuid())
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  email         String      @unique
+  name          String?
+  auth0Id       String      @unique
+  avatarUrl     String?
+  isPremium     Boolean     @default(false)
+  recordings    Recording[]
+  subscriptions Subscription[]
+}
+
+model Recording {
+  id           String     @id @default(cuid())
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  title        String
+  description  String?
+  audioUrl     String
+  duration     Int        // Duration in seconds
+  type         String     // "presentation", "speech", "interview", etc.
+  targetAudience String?  // "business", "academic", "general", etc.
+  isPublic     Boolean    @default(false)
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  analyses     Analysis[]
+}
+
+model Analysis {
+  id                String    @id @default(cuid())
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  recordingId       String
+  recording         Recording @relation(fields: [recordingId], references: [id], onDelete: Cascade)
+  transcription     String?   @db.Text
+  speechRate        Float?    // Words per minute
+  fillerWordsCount  Json?     // JSON object with filler word counts
+  tonality          Json?     // JSON object with tone analysis
+  confidenceScore   Float?    // 0-100 score
+  emotionAnalysis   Json?     // JSON object with emotion percentages
+  improvementAreas  String[]
+  strengths         String[]
+  feedback          String?   @db.Text
+  comparisonData    Json?     // For comparison with previous recordings
+}
+
+model Subscription {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan      String   // "free", "premium", "business"
+  status    String   // "active", "cancelled", "trialing"
+  startDate DateTime
+  endDate   DateTime?
+  metadata  Json?
+}
