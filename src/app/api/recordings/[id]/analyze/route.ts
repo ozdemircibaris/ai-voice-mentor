@@ -1,4 +1,3 @@
-// src/app/api/recordings/[id]/analyze/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { auth0 } from "@/lib/auth0";
 import prisma from "@/lib/prisma";
@@ -15,12 +14,18 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    // Kullanıcıyı bul
+    // Find user by Auth0 ID
     const user = await prisma.user.findUnique({
       where: { auth0Id: session.user.sub },
       include: {
         subscriptions: {
-          /* ... */
+          where: {
+            status: "active",
+          },
+          orderBy: {
+            createdAt: "desc",
+          },
+          take: 1,
         },
       },
     });
@@ -29,7 +34,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    // Kaydı getir
+    // Get recording
     const recording = await prisma.recording.findUnique({
       where: { id },
     });
@@ -38,20 +43,17 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       return NextResponse.json({ error: "Recording not found" }, { status: 404 });
     }
 
-    // Yetkilendirme kontrolü
+    // Authorization check
     if (recording.userId !== user.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
-    // Abonelik kontrolü
-    // ...
-
-    // 1. Ses dosyasını metne çevir
+    // Transcribe audio
     console.log("Transcribing audio...");
     const transcription = await transcribeAudio(recording.audioUrl);
     console.log("Transcription complete:", transcription.substring(0, 100) + "...");
 
-    // 2. Metni Gemini AI ile analiz et
+    // Analyze speech
     console.log("Analyzing speech with Gemini AI...");
     const analysisResult = await analyzeSpeech(transcription, {
       duration: recording.duration,
@@ -60,36 +62,42 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     });
     console.log("AI analysis complete");
 
-    // 3. Analiz sonuçlarını veritabanına kaydet
+    // Save analysis to database
     console.log("Saving analysis to database...");
     const analysis = await prisma.analysis.create({
       data: {
         recordingId: recording.id,
-        transcription: transcription,
-        speechRate: analysisResult.speechRate.wpm,
-        fillerWordsCount: analysisResult.fillerWords.mostCommon.reduce((obj, word) => {
-          obj[word] =
-            analysisResult.fillerWords.count > 0
-              ? Math.floor(analysisResult.fillerWords.count / analysisResult.fillerWords.mostCommon.length)
-              : 0;
-          return obj;
-        }, {}),
+        transcription: analysisResult.transcription,
+        speechRate: analysisResult.linguisticPerformance.wordsPerMinute,
+        fillerWordsCount: analysisResult.linguisticPerformance.fillerWordAnalysis.totalFillerWords,
         tonality: {
-          formal: 0,
-          friendly: 0,
-          persuasive: 0,
-          technical: 0,
+          overall: analysisResult.linguisticPerformance.pauseAnalysis.totalPauses,
+          variety: analysisResult.sentenceAnalysis.structureAssessment.flowRating,
         },
-        confidenceScore: analysisResult.emotionalTone.confidence,
+        confidenceScore: analysisResult.sentenceAnalysis.structureAssessment.coherenceScore,
         emotionAnalysis: {
-          confidence: analysisResult.emotionalTone.confidence,
-          enthusiasm: analysisResult.emotionalTone.enthusiasm,
+          confidence: analysisResult.sentenceAnalysis.structureAssessment.coherenceScore,
+          engagement: analysisResult.sentenceAnalysis.structureAssessment.grammaticalAccuracyScore,
         },
-        improvementAreas: analysisResult.improvementAreas,
-        strengths: analysisResult.strengths,
-        feedback: analysisResult.recommendations.join("\n\n"),
+        improvementAreas: analysisResult.comprehensiveFeedback.improvementAreas,
+        strengths: analysisResult.comprehensiveFeedback.strengths,
+        feedback: analysisResult.comprehensiveFeedback.detailedRecommendations.join("\n"),
+        comparisonData: {
+          wordAnalysis: {
+            totalWords: analysisResult.wordAnalysis.totalWords,
+            perfectWords: analysisResult.wordAnalysis.pronunciationBreakdown.perfectWords,
+            minorIssueWords: analysisResult.wordAnalysis.pronunciationBreakdown.minorIssueWords,
+            significantErrorWords: analysisResult.wordAnalysis.pronunciationBreakdown.significantErrorWords,
+            overallPronunciationScore: analysisResult.wordAnalysis.overallPronunciationScore,
+          },
+          sentenceAnalysis: {
+            totalSentences: analysisResult.sentenceAnalysis.totalSentences,
+            structureDetails: analysisResult.sentenceAnalysis.structureAssessment,
+          },
+        },
       },
     });
+
     console.log("Analysis saved successfully:", analysis.id);
 
     return NextResponse.json(analysis);
