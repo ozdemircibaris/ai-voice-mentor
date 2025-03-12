@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import {
   RadarChart,
   PolarGrid,
@@ -15,8 +15,20 @@ import {
   YAxis,
   CartesianGrid,
 } from "recharts";
-import { ArrowUpRight, Award, TrendingUp, Target, Headphones, Volume2, CheckCircle, FileText, Zap } from "lucide-react";
-import { Analysis, Recording } from "@/types";
+import {
+  ArrowUpRight,
+  Award,
+  TrendingUp,
+  Target,
+  Headphones,
+  Volume2,
+  CheckCircle,
+  FileText,
+  Zap,
+  Play,
+  Pause,
+} from "lucide-react";
+import { Analysis, Recording, WordTimestamp } from "@/types";
 
 interface AnalysisDisplayProps {
   recording: Recording;
@@ -27,6 +39,10 @@ const AnalysisDisplay = ({ recording, analysis }: AnalysisDisplayProps) => {
   const [activeTab, setActiveTab] = useState<
     "overview" | "transcription" | "pronunciation" | "pacing" | "structure" | "feedback"
   >("overview");
+
+  const [playingWord, setPlayingWord] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Category styling and icons mapping
   const categoryStyles = {
@@ -119,6 +135,69 @@ const AnalysisDisplay = ({ recording, analysis }: AnalysisDisplayProps) => {
     );
   };
 
+  // Play word audio function
+  const playWordAudio = (wordData: WordTimestamp) => {
+    // Stop any currently playing audio
+    if (audioRef.current) {
+      audioRef.current.pause();
+      if (audioTimeoutRef.current) {
+        clearTimeout(audioTimeoutRef.current);
+        audioTimeoutRef.current = null;
+      }
+    }
+
+    // If the same word is clicked again, just stop playing
+    if (playingWord === wordData.word) {
+      setPlayingWord(null);
+      return;
+    }
+
+    // Create audio element if it doesn't exist
+    if (!audioRef.current) {
+      audioRef.current = new Audio(recording.audioUrl);
+    }
+
+    // Add context before and after the word for better comprehension
+    const contextBuffer = 0.3; // seconds of context before and after the word
+
+    // Calculate start time with context (but don't go before 0)
+    const startTime = Math.max(0, wordData.startTime - contextBuffer);
+
+    // Set the current time to the adjusted start time
+    audioRef.current.currentTime = startTime;
+
+    // Slow down the playback rate for better clarity
+    audioRef.current.playbackRate = 0.75;
+
+    // Play the audio
+    audioRef.current
+      .play()
+      .then(() => {
+        // Set current playing word
+        setPlayingWord(wordData.word);
+
+        // Calculate the total duration including context
+        const originalDuration = wordData.endTime - wordData.startTime;
+        const extendedDuration = originalDuration + contextBuffer * 2;
+
+        // Adjust for the slower playback rate
+        const adjustedDuration = extendedDuration / audioRef.current!.playbackRate;
+
+        // Set a timeout to stop the audio after the extended word duration
+        audioTimeoutRef.current = setTimeout(() => {
+          if (audioRef.current) {
+            audioRef.current.pause();
+            // Reset playback rate for next play
+            audioRef.current.playbackRate = 1.0;
+          }
+          setPlayingWord(null);
+        }, adjustedDuration * 1000);
+      })
+      .catch((error) => {
+        console.error("Error playing audio:", error);
+        setPlayingWord(null);
+      });
+  };
   // Tab content rendering functions
   const renderOverviewTab = () => (
     <div className="space-y-6">
@@ -141,10 +220,16 @@ const AnalysisDisplay = ({ recording, analysis }: AnalysisDisplayProps) => {
             icon: Zap,
           },
         ].map(({ label, value, icon: Icon }) => (
-          <div key={label} className="bg-white rounded-lg shadow p-4 flex flex-col items-center">
-            <Icon className="h-8 w-8 text-blue-500 mb-2" />
-            <div className="text-sm font-medium text-gray-500">{label}</div>
-            <div className="text-2xl font-bold text-gray-900">{value}</div>
+          <div key={label} className="bg-white p-6 rounded-lg shadow">
+            <div className="flex items-center">
+              <div className="p-3 rounded-full bg-blue-100 bg-opacity-80">
+                <Icon className="h-8 w-8 text-blue-600" />
+              </div>
+              <div className="ml-4">
+                <h2 className="text-sm font-medium text-gray-600">{label}</h2>
+                <p className="text-3xl font-semibold text-gray-900">{value}</p>
+              </div>
+            </div>
           </div>
         ))}
       </div>
@@ -247,11 +332,28 @@ const AnalysisDisplay = ({ recording, analysis }: AnalysisDisplayProps) => {
             <div className="mb-4">
               <h4 className="font-medium text-gray-700 mb-2">Words with Minor Issues:</h4>
               <div className="flex flex-wrap gap-2">
-                {analysis.comparisonData.wordAnalysis.minorIssueWords.map((word, index) => (
-                  <span key={index} className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm">
-                    {word}
-                  </span>
-                ))}
+                {analysis.wordTimestamps?.minorIssueWords && analysis.wordTimestamps.minorIssueWords.length > 0
+                  ? // Use timestamps for interactive playback
+                    analysis.wordTimestamps.minorIssueWords.map((wordData, index) => (
+                      <div key={index} className="inline-flex items-center">
+                        <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-l-full text-sm">
+                          {wordData.word}
+                        </span>
+                        <button
+                          onClick={() => playWordAudio(wordData)}
+                          className="h-7 px-2 bg-yellow-200 hover:bg-yellow-300 text-yellow-800 rounded-r-full flex items-center justify-center transition-colors"
+                          title="Listen to pronunciation"
+                        >
+                          {playingWord === wordData.word ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
+                        </button>
+                      </div>
+                    ))
+                  : // Fallback if timestamps aren't available
+                    analysis.comparisonData.wordAnalysis.minorIssueWords.map((word, index) => (
+                      <span key={index} className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm">
+                        {word}
+                      </span>
+                    ))}
               </div>
             </div>
           )}
@@ -260,11 +362,29 @@ const AnalysisDisplay = ({ recording, analysis }: AnalysisDisplayProps) => {
             <div>
               <h4 className="font-medium text-gray-700 mb-2">Words with Significant Errors:</h4>
               <div className="flex flex-wrap gap-2">
-                {analysis.comparisonData.wordAnalysis.significantErrorWords.map((word, index) => (
-                  <span key={index} className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-sm">
-                    {word}
-                  </span>
-                ))}
+                {analysis.wordTimestamps?.significantErrorWords &&
+                analysis.wordTimestamps.significantErrorWords.length > 0
+                  ? // Use timestamps for interactive playback
+                    analysis.wordTimestamps.significantErrorWords.map((wordData, index) => (
+                      <div key={index} className="inline-flex items-center">
+                        <span className="px-2 py-1 bg-red-100 text-red-800 rounded-l-full text-sm">
+                          {wordData.word}
+                        </span>
+                        <button
+                          onClick={() => playWordAudio(wordData)}
+                          className="h-7 px-2 bg-red-200 hover:bg-red-300 text-red-800 rounded-r-full flex items-center justify-center transition-colors"
+                          title="Listen to pronunciation"
+                        >
+                          {playingWord === wordData.word ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
+                        </button>
+                      </div>
+                    ))
+                  : // Fallback if timestamps aren't available
+                    analysis.comparisonData.wordAnalysis.significantErrorWords.map((word, index) => (
+                      <span key={index} className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-sm">
+                        {word}
+                      </span>
+                    ))}
               </div>
             </div>
           )}

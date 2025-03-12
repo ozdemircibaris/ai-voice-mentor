@@ -48,14 +48,15 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
-    // Transcribe audio
-    console.log("Transcribing audio...");
-    const transcription = await transcribeAudio(recording.audioUrl);
-    console.log("Transcription complete:", transcription.substring(0, 100) + "...");
+    // Transcribe audio with word timestamps
+    console.log("Transcribing audio with timestamps...");
+    const transcriptionResult = await transcribeAudio(recording.audioUrl);
+    console.log("Transcription complete:", transcriptionResult.text.substring(0, 100) + "...");
+    console.log(`Received ${transcriptionResult.wordTimestamps.length} word timestamps`);
 
     // Analyze speech
     console.log("Analyzing speech with Gemini AI...");
-    const analysisResult = await analyzeSpeech(transcription, {
+    const analysisResult = await analyzeSpeech(transcriptionResult, {
       duration: recording.duration,
       type: recording.type,
       targetAudience: recording.targetAudience || "general",
@@ -82,6 +83,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         improvementAreas: analysisResult.comprehensiveFeedback.improvementAreas,
         strengths: analysisResult.comprehensiveFeedback.strengths,
         feedback: analysisResult.comprehensiveFeedback.detailedRecommendations.join("\n"),
+        // Save word timestamps for playback
+        wordTimestamps: {
+          perfectWords: analysisResult.wordAnalysis.wordTimestamps.perfectWords || [],
+          minorIssueWords: analysisResult.wordAnalysis.wordTimestamps.minorIssueWords || [],
+          significantErrorWords: analysisResult.wordAnalysis.wordTimestamps.significantErrorWords || [],
+        },
         comparisonData: {
           wordAnalysis: {
             totalWords: analysisResult.wordAnalysis.totalWords,

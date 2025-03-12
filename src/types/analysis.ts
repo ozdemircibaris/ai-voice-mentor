@@ -1,16 +1,36 @@
+export interface WordTimestamp {
+  word: string;
+  startTime: number; // seconds
+  endTime: number; // seconds
+}
+
 export interface Analysis {
   id: string;
   createdAt: Date;
   updatedAt: Date;
   recordingId: string;
   transcription?: string;
+  speechRate?: number;
+  fillerWordsCount?: any;
+  tonality?: any;
+  confidenceScore?: number;
+  emotionAnalysis?: any;
+  improvementAreas?: string[];
+  strengths?: string[];
+  feedback?: string;
+  comparisonData?: any;
 
-  wordAnalysis: {
+  wordAnalysis?: {
     totalWords: number;
     pronunciationBreakdown: {
       perfectWords: string[];
       minorIssueWords: string[];
       significantErrorWords: string[];
+    };
+    wordTimestamps?: {
+      perfectWords: WordTimestamp[];
+      minorIssueWords: WordTimestamp[];
+      significantErrorWords: WordTimestamp[];
     };
     overallPronunciationScore: number;
     pronunciationFeedback: {
@@ -19,7 +39,7 @@ export interface Analysis {
     };
   };
 
-  sentenceAnalysis: {
+  sentenceAnalysis?: {
     totalSentences: number;
     structureAssessment: {
       coherenceScore: number;
@@ -29,7 +49,7 @@ export interface Analysis {
     };
   };
 
-  linguisticPerformance: {
+  linguisticPerformance?: {
     wordsPerMinute: number;
     pauseAnalysis: {
       totalPauses: number;
@@ -43,7 +63,7 @@ export interface Analysis {
     };
   };
 
-  comprehensiveFeedback: {
+  comprehensiveFeedback?: {
     strengths: string[];
     improvementAreas: string[];
     detailedRecommendations: string[];

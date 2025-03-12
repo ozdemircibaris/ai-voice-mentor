@@ -2,14 +2,21 @@ import { generateText } from "ai";
 import { google } from "@ai-sdk/google";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { GoogleAIFileManager } from "@google/generative-ai/server";
+import { WordTimestamp } from "@/types/analysis";
 
-export const geminiModel = google("gemini-2.0-flash-exp");
+export const geminiModel = google("gemini-2.0-pro-exp-02-05");
 
 const apiKey = process.env.GEMINI_API_KEY as string;
 const genAI = new GoogleGenerativeAI(apiKey);
 const fileManager = new GoogleAIFileManager(apiKey);
 
-export async function transcribeAudio(audioFileUrl: string): Promise<string> {
+// Transcription result with word timestamps
+interface TranscriptionResult {
+  text: string;
+  wordTimestamps: WordTimestamp[];
+}
+
+export async function transcribeAudio(audioFileUrl: string): Promise<TranscriptionResult> {
   try {
     console.log("Fetching audio from URL:", audioFileUrl);
     const audioResponse = await fetch(audioFileUrl);
@@ -22,11 +29,13 @@ export async function transcribeAudio(audioFileUrl: string): Promise<string> {
       displayName: "audio_recording.wav",
     });
 
+    // For Gemini model
     const model = genAI.getGenerativeModel({
-      model: "gemini-2.0-flash",
+      // model: "gemini-2.0-flash",
+      model: "gemini-2.0-pro-exp-02-05",
     });
 
-    console.log("Requesting transcription...");
+    console.log("Requesting transcription with word timestamps...");
     const result = await model.generateContent({
       contents: [
         {
@@ -39,17 +48,51 @@ export async function transcribeAudio(audioFileUrl: string): Promise<string> {
               },
             },
             {
-              text: "Please transcribe this audio file with the highest accuracy. Include all speech details, nuances, and contextual information. If multiple speakers are present, distinguish between them. Preserve the original language and provide linguistic context.",
+              text: 'Please transcribe this audio file with the highest accuracy. Include word-level timestamps. Format your response as JSON with this structure: {"transcription": "full text here", "words": [{"word": "example", "startTime": 1.2, "endTime": 1.5}, ...]}',
             },
           ],
         },
       ],
     });
 
-    const transcription = result.response.text();
-    console.log("Transcription completed:", transcription.substring(0, 100) + "...");
+    const responseText = result.response.text();
+    console.log("Transcription completed with timestamps");
 
-    return transcription;
+    // Parse the response to extract timestamps
+    // This is a simplified version - in production we'd need more robust parsing
+    try {
+      // Try to parse direct JSON response
+      const parsedResponse = JSON.parse(responseText);
+      if (parsedResponse.transcription && Array.isArray(parsedResponse.words)) {
+        return {
+          text: parsedResponse.transcription,
+          wordTimestamps: parsedResponse.words,
+        };
+      }
+    } catch (e) {
+      // If direct parsing fails, try to extract JSON from text
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        try {
+          const parsedJson = JSON.parse(jsonMatch[0]);
+          if (parsedJson.transcription && Array.isArray(parsedJson.words)) {
+            return {
+              text: parsedJson.transcription,
+              wordTimestamps: parsedJson.words,
+            };
+          }
+        } catch (e2) {
+          console.error("Failed to parse JSON from response:", e2);
+        }
+      }
+    }
+
+    // Fallback: If we couldn't extract proper timestamps, return the text with empty timestamps
+    console.warn("Could not extract word timestamps, returning text only");
+    return {
+      text: responseText.replace(/\{[\s\S]*\}/, "").trim(),
+      wordTimestamps: [],
+    };
   } catch (error) {
     console.error("Error in transcribeAudio:", error);
     throw error;
@@ -57,7 +100,7 @@ export async function transcribeAudio(audioFileUrl: string): Promise<string> {
 }
 
 export async function analyzeSpeech(
-  transcription: string,
+  transcriptionResult: TranscriptionResult,
   audioMetadata: {
     duration: number;
     type: string;
@@ -65,10 +108,12 @@ export async function analyzeSpeech(
   },
 ): Promise<SpeechAnalysisResult> {
   try {
-    if (transcription.trim().split(/\s+/).length < 10) {
-      return createFallbackAnalysis(transcription);
-    }
+    const transcription = transcriptionResult.text;
+    const wordTimestamps = transcriptionResult.wordTimestamps;
 
+    // if (transcription.trim().split(/\s+/).length < 10) {
+    //   return createFallbackAnalysis(transcription, wordTimestamps);
+    // }
     const prompt = `
 Advanced Linguistic Speech Analysis Request:
 
@@ -85,14 +130,22 @@ I. COUNTING METHODOLOGY (BE EXACT AND CONSISTENT):
 - Total Sentences: Count each grammatically complete sentence precisely. Split by periods, question marks, and exclamation points.
 - All counting must be exact, consistent, and follow standardized linguistic definitions.
 
-II. WORD-LEVEL ANALYSIS
-- Perform a detailed word-by-word pronunciation assessment
-- Identify pronunciation challenges
-- Evaluate stress and intonation for each significant word
+II. WORD-LEVEL ANALYSIS - STRICT PRONUNCIATION ASSESSMENT
+- Apply the STRICTEST possible standards for pronunciation assessment with ZERO TOLERANCE for pronunciation errors
+- For each word, critically evaluate exact phonetic pronunciation against standard norms
+- Flag ANY deviation from standard pronunciation, no matter how minor
+- Pay special attention to:
+  * Vowel and consonant sounds that differ from standard pronunciation
+  * Stress patterns on the wrong syllable
+  * Subtle phonetic variations that indicate non-native or regional patterns
+  * Blended or unclear articulation of any phoneme
+- You must be INTENTIONALLY STRICT to provide maximum value to the speaker
+- Do not be lenient or polite - identify ALL words with ANY pronunciation issues
 - Categorize words into:
-  * Perfectly pronounced
-  * Slight pronunciation issues
-  * Significant pronunciation errors
+  * Perfectly pronounced (ONLY if 100% exact standard pronunciation)
+  * Minor issues (any slight deviation from perfect pronunciation)
+  * Significant errors (words that would be difficult for listeners to understand correctly)
+- Even common words deserve scrutiny - do not assume they are pronounced correctly
 
 III. SENTENCE-LEVEL ANALYSIS
 - Assess sentence structure coherence
@@ -123,6 +176,7 @@ CRITICAL INSTRUCTIONS:
 - Counts of words, sentences, etc. must be precise and follow standard rules
 - Confidently provide scores based on objective linguistic criteria
 - Your scores should reflect clear benchmarks (e.g., 95% means excellent, 50% means average)
+- For pronunciation, err on the side of strictness - it's better to identify too many potential issues than too few
 
 RESPONSE FORMAT REQUIREMENTS:
 
@@ -209,7 +263,7 @@ Return ONLY the JSON object with no additional text before or after.
         throw new Error("Required fields missing in analysis response");
       }
 
-      return formatAnalysisResult(transcription, parsedAnalysis);
+      return formatAnalysisResult(transcription, parsedAnalysis, wordTimestamps);
     } catch (error) {
       console.error("Failed to parse AI response:", error);
       console.error("Raw response:", response.text);
@@ -234,27 +288,81 @@ Return ONLY the JSON object with no additional text before or after.
         }
 
         const parsedAnalysis = JSON.parse(jsonString);
-        return formatAnalysisResult(transcription, parsedAnalysis);
+        return formatAnalysisResult(transcription, parsedAnalysis, wordTimestamps);
       } catch (secondError) {
         console.error("Failed to parse AI response on retry:", secondError);
-        return createFallbackAnalysis(transcription);
+        return createFallbackAnalysis(transcription, wordTimestamps);
       }
     }
   } catch (error) {
     console.error("Error calling Gemini API:", error);
-    return createFallbackAnalysis(transcription);
+    return createFallbackAnalysis(transcription, []);
   }
 }
 
-function formatAnalysisResult(transcription: string, parsedAnalysis: any): SpeechAnalysisResult {
+// Associate word timestamps with the analysis results
+function associateWordTimestamps(wordList: string[], allWordTimestamps: WordTimestamp[]): WordTimestamp[] {
+  if (!allWordTimestamps || allWordTimestamps.length === 0) {
+    return [];
+  }
+
+  // Create a map for faster lookups
+  const wordMap = new Map<string, WordTimestamp[]>();
+
+  allWordTimestamps.forEach((timestamp) => {
+    if (!wordMap.has(timestamp.word)) {
+      wordMap.set(timestamp.word, []);
+    }
+    wordMap.get(timestamp.word)!.push(timestamp);
+  });
+
+  // Find timestamps for each word in our list
+  return wordList.map((word) => {
+    // Try to find the word in our timestamps
+    const matches = wordMap.get(word) || [];
+    if (matches.length > 0) {
+      // Take the first match and remove it from the map to avoid duplicates
+      const match = matches.shift()!;
+      return match;
+    }
+
+    // If no timestamp found, return placeholder
+    return {
+      word,
+      startTime: 0,
+      endTime: 0,
+    };
+  });
+}
+
+function formatAnalysisResult(
+  transcription: string,
+  parsedAnalysis: any,
+  wordTimestamps: WordTimestamp[],
+): SpeechAnalysisResult {
+  // Get pronunciation issue words
+  const perfectWords = parsedAnalysis.word_analysis?.pronunciation_breakdown?.perfect_words?.words || [];
+  const minorIssueWords = parsedAnalysis.word_analysis?.pronunciation_breakdown?.minor_issues?.words || [];
+  const significantErrorWords = parsedAnalysis.word_analysis?.pronunciation_breakdown?.significant_errors?.words || [];
+
+  // Associate timestamps with problem words
+  const perfectWordTimestamps = associateWordTimestamps(perfectWords, wordTimestamps);
+  const minorIssueWordTimestamps = associateWordTimestamps(minorIssueWords, wordTimestamps);
+  const significantErrorWordTimestamps = associateWordTimestamps(significantErrorWords, wordTimestamps);
+
   return {
     transcription: transcription,
     wordAnalysis: {
       totalWords: parsedAnalysis.word_analysis?.total_words || 0,
       pronunciationBreakdown: {
-        perfectWords: parsedAnalysis.word_analysis?.pronunciation_breakdown?.perfect_words?.words || [],
-        minorIssueWords: parsedAnalysis.word_analysis?.pronunciation_breakdown?.minor_issues?.words || [],
-        significantErrorWords: parsedAnalysis.word_analysis?.pronunciation_breakdown?.significant_errors?.words || [],
+        perfectWords: perfectWords,
+        minorIssueWords: minorIssueWords,
+        significantErrorWords: significantErrorWords,
+      },
+      wordTimestamps: {
+        perfectWords: perfectWordTimestamps,
+        minorIssueWords: minorIssueWordTimestamps,
+        significantErrorWords: significantErrorWordTimestamps,
       },
       overallPronunciationScore: parsedAnalysis.word_analysis?.overall_pronunciation_score || 0,
       pronunciationFeedback: {
@@ -293,12 +401,17 @@ function formatAnalysisResult(transcription: string, parsedAnalysis: any): Speec
   };
 }
 
-function createFallbackAnalysis(transcription: string): SpeechAnalysisResult {
+function createFallbackAnalysis(transcription: string, wordTimestamps: WordTimestamp[]): SpeechAnalysisResult {
   return {
     transcription: transcription,
     wordAnalysis: {
       totalWords: transcription.split(/\s+/).length,
       pronunciationBreakdown: {
+        perfectWords: [],
+        minorIssueWords: [],
+        significantErrorWords: [],
+      },
+      wordTimestamps: {
         perfectWords: [],
         minorIssueWords: [],
         significantErrorWords: [],
@@ -351,6 +464,11 @@ export interface SpeechAnalysisResult {
       perfectWords: string[];
       minorIssueWords: string[];
       significantErrorWords: string[];
+    };
+    wordTimestamps: {
+      perfectWords: WordTimestamp[];
+      minorIssueWords: WordTimestamp[];
+      significantErrorWords: WordTimestamp[];
     };
     overallPronunciationScore: number;
     pronunciationFeedback: {
