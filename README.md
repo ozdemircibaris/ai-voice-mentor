@@ -191,46 +191,6 @@ voice-mentor/
 2. Update the `DATABASE_URL` in your environment
 3. Run Prisma migrations
 
-## 🤝 Contributing
-
-We welcome contributions from the community! Here's how you can help:
-
-### Development Process
-
-1. **Fork the repository**
-2. **Create a feature branch**
-   ```bash
-   git checkout -b feature/amazing-feature
-   ```
-3. **Make your changes**
-4. **Add tests** (if applicable)
-5. **Commit your changes**
-   ```bash
-   git commit -m "Add amazing feature"
-   ```
-6. **Push to the branch**
-   ```bash
-   git push origin feature/amazing-feature
-   ```
-7. **Open a Pull Request**
-
-### Code Style
-
-- Use **TypeScript** for all new files
-- Follow **ESLint** rules (run `npm run lint`)
-- Use **Prettier** for code formatting
-- Write **descriptive commit messages**
-- Add **JSDoc comments** for functions
-
-### Areas for Contribution
-
-- 🌍 **Internationalization**: Add support for more languages
-- 🎨 **UI/UX Improvements**: Enhance the user interface
-- 🤖 **AI Features**: Improve speech analysis algorithms
-- 📱 **Mobile Experience**: Optimize for mobile devices
-- 🧪 **Testing**: Add unit and integration tests
-- 📚 **Documentation**: Improve docs and tutorials
-
 ## 📖 API Documentation
 
 ### Recording Endpoints
