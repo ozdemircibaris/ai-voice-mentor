@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { Mic, Clock, ChevronRight, FileText, BarChart, Plus } from "lucide-react";
 import prisma from "@/lib/prisma";
 import RecordingsList from "@/components/dashboard/RecordingsList";
+import IntercomInitializerProvider from "@/utils/IntercomInitializerProvider";
 
 async function getDashboardData() {
   const session = await auth0.getSession();

@@ -134,7 +134,7 @@ const AnalysisDisplay = ({ recording, analysis }: AnalysisDisplayProps) => {
       </div>
     );
   };
-
+  console.log("analysis", analysis);
   // Play word audio function
   const playWordAudio = (wordData: WordTimestamp) => {
     // Stop any currently playing audio
@@ -362,8 +362,8 @@ const AnalysisDisplay = ({ recording, analysis }: AnalysisDisplayProps) => {
             <div>
               <h4 className="font-medium text-gray-700 mb-2">Words with Significant Errors:</h4>
               <div className="flex flex-wrap gap-2">
-                {analysis.wordTimestamps?.significantErrorWords &&
-                analysis.wordTimestamps.significantErrorWords.length > 0
+                {analysis?.wordTimestamps?.significantErrorWords &&
+                analysis?.wordTimestamps.significantErrorWords.length > 0
                   ? // Use timestamps for interactive playback
                     analysis.wordTimestamps.significantErrorWords.map((wordData, index) => (
                       <div key={index} className="inline-flex items-center">

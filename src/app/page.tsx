@@ -1,10 +1,12 @@
+"use client";
+
 // app/page.tsx
 import Link from "next/link";
-import { auth0 } from "@/lib/auth0";
+// import { auth0 } from "@/lib/auth0";
 import { Mic, Award, BarChart4, Book, Users, CheckCircle, Play } from "lucide-react";
 
-export default async function Home() {
-  const session = await auth0.getSession();
+export default function Home() {
+  // const session = await auth0.getSession();
 
   return (
     <div className="bg-white overflow-hidden">
@@ -25,7 +27,7 @@ export default async function Home() {
                 you become a more confident and effective speaker.
               </p>
               <div className="mt-10 flex flex-col sm:flex-row gap-4">
-                {!session ? (
+                {/* {!session ? (
                   <>
                     <a
                       href="/auth/login?screen_hint=signup&returnTo=/dashboard"
@@ -47,7 +49,7 @@ export default async function Home() {
                   >
                     Go to Dashboard
                   </Link>
-                )}
+                )} */}
               </div>
 
               {/* Social proof */}
@@ -155,7 +157,6 @@ export default async function Home() {
           </svg>
         </div>
       </div>
-
       {/* How it Works Section */}
       <div className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -216,7 +217,6 @@ export default async function Home() {
           </div>
         </div>
       </div>
-
       {/* Features Section with Tabs */}
       <div className="py-20 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -300,7 +300,6 @@ export default async function Home() {
           </div>
         </div>
       </div>
-
       {/* Testimonials Section */}
       <div className="py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -383,7 +382,6 @@ export default async function Home() {
           </div>
         </div>
       </div>
-
       {/* Pricing Section - Improved cards with feature lists */}
       <div className="py-20 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -512,7 +510,6 @@ export default async function Home() {
           </div>
         </div>
       </div>
-
       {/* FAQ Section */}
       <div className="py-20 bg-white">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -555,7 +552,6 @@ export default async function Home() {
           </div>
         </div>
       </div>
-
       {/* CTA Section */}
       <div className="relative bg-gradient-to-r from-blue-600 to-indigo-700 py-20">
         <div className="absolute inset-0 bg-blue-700 opacity-10 bg-opacity-50"></div>
@@ -580,7 +576,6 @@ export default async function Home() {
           </div>
         </div>
       </div>
-
       {/* End of page content */}
     </div>
   );

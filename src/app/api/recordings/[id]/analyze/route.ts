@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth0 } from "@/lib/auth0";
 import prisma from "@/lib/prisma";
-import { transcribeAudio, analyzeSpeech } from "@/lib/ai/gemini-client";
+import { transcribeAudioWithAzure, analyzeTranscriptionWithAzure } from "@/lib/ai/azure-whisper-client";
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  try {
-    const { id } = params;
-    console.log("Starting analysis for recording:", id);
+  const { id } = params;
+  console.log("Starting analysis for recording:", id);
 
+  try {
     const session = await auth0.getSession();
 
     if (!session || !session.user) {
@@ -48,20 +48,19 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
-    // Transcribe audio with word timestamps
-    console.log("Transcribing audio with timestamps...");
-    const transcriptionResult = await transcribeAudio(recording.audioUrl);
+    // Transcribe audio using Azure
+    console.log("Transcribing audio with Azure API...");
+    const transcriptionResult = await transcribeAudioWithAzure(recording.audioUrl);
     console.log("Transcription complete:", transcriptionResult.text.substring(0, 100) + "...");
-    console.log(`Received ${transcriptionResult.wordTimestamps.length} word timestamps`);
 
-    // Analyze speech
-    console.log("Analyzing speech with Gemini AI...");
-    const analysisResult = await analyzeSpeech(transcriptionResult, {
+    // Generate analysis from transcription using Azure
+    console.log("Generating analysis from transcription...");
+    const analysisResult = await analyzeTranscriptionWithAzure(transcriptionResult, {
       duration: recording.duration,
       type: recording.type,
       targetAudience: recording.targetAudience || "general",
     });
-    console.log("AI analysis complete");
+    console.log("Analysis generation complete");
 
     // Save analysis to database
     console.log("Saving analysis to database...");
@@ -110,12 +109,41 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json(analysis);
   } catch (error: any) {
     console.error("Error analyzing recording:", error);
-    return NextResponse.json(
-      {
-        error: "Internal server error",
-        details: error.message,
-      },
-      { status: 500 },
-    );
+
+    // More specific error status codes based on error type
+    if (error.message.includes("Transcription is too short")) {
+      return NextResponse.json(
+        {
+          error: "Insufficient content",
+          details: error.message,
+        },
+        { status: 422 }, // Unprocessable Entity
+      );
+    } else if (error.message.includes("Not authenticated") || error.message.includes("Unauthorized")) {
+      return NextResponse.json(
+        {
+          error: "Authentication error",
+          details: error.message,
+        },
+        { status: 401 },
+      );
+    } else if (error.message.includes("Not found")) {
+      return NextResponse.json(
+        {
+          error: "Resource not found",
+          details: error.message,
+        },
+        { status: 404 },
+      );
+    } else {
+      // Generic server error for other cases
+      return NextResponse.json(
+        {
+          error: "Analysis failed",
+          details: error.message,
+        },
+        { status: 500 },
+      );
+    }
   }
 }
